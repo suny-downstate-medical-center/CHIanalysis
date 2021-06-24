@@ -4,7 +4,7 @@ import numpy as np # math
 from os import listdir 
 import os
 from pylab import convolve # convolution function
-from siobhan_analysis import intervalsBelow
+from analysis import intervalsBelow
 
 plt.ion()
 
