@@ -9,4 +9,4 @@ integral of y-position during foot falls over time).
 
 To generate visualizations of foot fall absition during beam walk 
 in control and head injured animals at two time points post-injury,
-run 'python3 -i absition_examples.py'.
+run `python3 -i absition_examples.py`.
