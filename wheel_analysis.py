@@ -202,6 +202,7 @@ def plotVidFrames(vidfile, frames, df, nrows=2, xlims=None, points=None, likelih
         ax.legend()
 
 def allRunningEpochs(data_dir, folders, epoch_file='epoch_data.csv'):
+    # basic statistics on running epochs 
     out = {'avg' : [], 'std' : [], 'N' : [], 'err' : []}
     for folder in folders:
         pathname = data_dir + folder
@@ -252,6 +253,7 @@ def longestRunningEpoch(pathname, epoch_file, fps=240, var='relative_dist'):
         y1 = y1 / np.max(y1)
         corr = correlate(y0, y1)
         lags = correlation_lags(len(y0), len(y1))
+        lags = [l/fps for l in lags]
         corr_peaks[pair] = np.max(corr) / T
         corr_peak_lags[pair] = lags[np.argmax(corr)]
         # plt.figure()
@@ -311,6 +313,7 @@ def analyzeEpochedFolder(pathname, epoch_file, fps=240, var='relative_dist'):
                 y1 = y1 / np.max(y1)
                 corr = correlate(y0, y1)
                 lags = correlation_lags(len(y0), len(y1))
+                lags = [l/fps for l in lags]
                 # plt.figure()
                 # plt.subplot(311)
                 # plt.title(str(pair) + ' ' + str(epoch))
@@ -337,6 +340,7 @@ def analyzeEpochedFolder(pathname, epoch_file, fps=240, var='relative_dist'):
     return out
 
 def corrLongestEpoch(data_dir, folders, epoch_file='epoch_data.csv'):
+    print('Analyzing correlations for longest running epochs of each animal:')
     out = {rl_pair : {'peaks' : [], 'lags' : []}, 
            lr_pair : {'peaks' : [], 'lags' : []}}
     for folder in folders:
@@ -391,196 +395,290 @@ def extractPhaseMetrics(data):
 #     data = analyzeEpochedFolder(pathname, epoch_file)
 
 if __name__ == '__main__':
-    # paths and file names 
+    # initial setup 
+    import time as systime
+    start_time = systime.time()
+    import argparse
+    from os import listdir, mkdir  
+    import json
+    ## parse user input 
+    parser = argparse.ArgumentParser(description = '''Analyze running sessions for animals of a particular condition on a particular day''')
+    parser.add_argument('--OutputFolder', nargs='?', type=str, default='./')
+    parser.add_argument('--Folder', nargs='?', type=str, default='data/SW_D3/Sham/')
+    args = parser.parse_args()
     epoch_file = 'epoch_data.csv' # 'epoch_data_chi.csv'
-    # cmplx_sham_dir = 'wheel_data/complex_wheel_day_3/Sham/'
-    # cmplx_sham_folders = ['09/', '10/', '11/', '12/']
-    # cmplx_chi_dir = 'wheel_data/complex_wheel_day_3/CHI/'
-    # cmplx_chi_folders = ['86/', '87/', '97/', '98/']
-    day = 'D3'
-    cmplx_sham_dir = 'data/SW_D3/'
-    # cmplx_sham_folders = ['318087/',
-    #                     '318510/',
-    #                     '318512/',
-    #                     '318511/',
-    #                     '318509/',
-    #                     '318098/',
-    #                     '318097/',
-    #                     '318086/']
-    cmplx_sham_folders = ['318086/',
-                        '318087/',
-                        '318097/',
-                        '318098/']
-    # cmplx_chi_dir = 'data/SW_D6/'
-    cmplx_chi_dir = cmplx_sham_dir
-    cmplx_chi_folders = ['318509/',
-                        '318510/',
-                        '318511/',
-                        '318512/']
-    # cmplx_chi_folders = ['318098/',
-    #                     '318086/',
-    #                     '318087/',
-    #                     '318512/',
-    #                     '318097/',
-    #                     '318509/',
-    #                     '318511/',
-    #                     '318510/']
+    ## data and output folders 
+    base_folder = args.Folder
+    animal_folders = listdir(base_folder)
+    animal_folders = [fd+'/' for fd in animal_folders]
+    output_folder = args.OutputFolder
+    try:
+        mkdir(output_folder)
+    except:
+        pass 
+
     # basic running epoch stats 
-    ep_fig, ep_axs = plt.subplots(1,2)
-    cmplx_sham_ep_data = allRunningEpochs(cmplx_sham_dir, cmplx_sham_folders)
-    cmplx_chi_ep_data = allRunningEpochs(cmplx_chi_dir, cmplx_chi_folders)
-    ep_axs[0].errorbar([i for i in range(len(cmplx_sham_folders))], cmplx_sham_ep_data['avg'], yerr=cmplx_sham_ep_data['err'], color='blue', label='Sham')
-    ep_axs[0].errorbar([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_ep_data['avg'], yerr=cmplx_chi_ep_data['err'], color='red', label='CHI')
-    ep_axs[0].set_ylabel('Running Epoch Duration')
-    ep_axs[0].set_xlabel('Animal ID')
-    ep_axs[1].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_ep_data['N'], color='blue', label='Sham')
-    ep_axs[1].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_ep_data['N'], color='red', label='CHI')
-    ep_axs[1].set_ylabel('Number of Running Epochs')
-    ep_axs[1].set_xlabel('Animal ID')
-    ep_axs[1].legend()
-    ep_fig.savefig('figures/epoch_stats_' + day + '.png')
-    plt.tight_layout()
-    # correlation data from longest running epoch 
-    ## sham data
-    cmplx_sham_corrs = corrLongestEpoch(cmplx_sham_dir, cmplx_sham_folders)
-    ## CHI data
-    cmplx_chi_corrs = corrLongestEpoch(cmplx_chi_dir, cmplx_chi_folders)
-    lngcr_fig, lngcr_axs = plt.subplots(2, 2)
-    lngcr_axs[0][0].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[rl_pair]['peaks'], '*-', label='Sham')
-    lngcr_axs[0][0].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[rl_pair]['peaks'], '*-', label='CHI')
-    lngcr_axs[0][0].set_title(str(rl_pair))
-    lngcr_axs[0][0].set_ylabel('peak correlation')
-    lngcr_axs[1][0].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[rl_pair]['lags'], '*-', label='Sham')
-    lngcr_axs[1][0].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[rl_pair]['lags'],  '*-', label='CHI')
-    lngcr_axs[1][0].set_ylabel('peak lag')
-    lngcr_axs[1][0].set_xlabel('animal id')
-    lngcr_axs[0][1].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[lr_pair]['peaks'], '*-', label='Sham')
-    lngcr_axs[0][1].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[lr_pair]['peaks'],  '*-', label='CHI')
-    lngcr_axs[0][1].set_title(str(lr_pair))
-    lngcr_axs[1][1].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[lr_pair]['lags'], '*-', label='Sham')
-    lngcr_axs[1][1].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[lr_pair]['lags'],  '*-', label='CHI')
-    lngcr_axs[1][1].set_xlabel('animal id')
-    lngcr_fig.savefig('figures/longest_epoch_' + day + '_corr.png')
-    plt.tight_layout()
-    # difference betwen left forearm - right hindleg peak lag and right forearm - left hindleg peak lag 
-    cmplx_sham_lag_diff = [lr-rl for lr, rl in zip(cmplx_sham_corrs[lr_pair]['lags'], cmplx_sham_corrs[rl_pair]['lags'])]
-    cmplx_chi_lag_diff = [lr-rl for lr, rl in zip(cmplx_chi_corrs[lr_pair]['lags'], cmplx_chi_corrs[rl_pair]['lags'])]
-    lagdif_fig, lagdif_axs = plt.subplots(1,1)
-    lagdif_axs.plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_lag_diff)
-    lagdif_axs.plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_lag_diff)
-    lagdif_axs.set_ylabel('Difference in peak lag')
-    lagdif_fig.savefig('figures/diffInPeaklag_longestEpoch' + day + '.png')
-    # looking at all running epochs 
-    ## sham
-    fig, axs = plt.subplots(2,3)
-    sham_lag_difs = []
-    sham_peak_difs = []
+    epoch_stats = allRunningEpochs(base_folder, animal_folders)
+    with open(output_folder + 'epochStats.json', 'w') as fileObj:
+        json.dump(epoch_stats, fileObj)
+    print('Epoch statistics execution time: %.2f seconds' % (systime.time() - start_time))
+
+    # correlation analysis of longest running epochs for each animal 
+    corrtime = systime.time()
+    longest_epoch_corr = corrLongestEpoch(base_folder, animal_folders)
+    corr_output = {'rl' : longest_epoch_corr[('right_forearm1', 'left_hindleg1')], 
+                    'lr' : longest_epoch_corr[('left_forearm1', 'right_hindleg1')]}
+    # for key in corr_output:
+    #     corr_output[key]['lags'] = [int(l) for l in corr_output[key]['lags']]
+    with open(output_folder + 'longestRunnigEpoch.json', 'w') as fileObj:
+        json.dump(corr_output, fileObj)
+    print('Longest running epoch correlations execution time: %.2f seconds' % (systime.time() - corrtime))
+
+    # coorelation analysis of all running epochs 
+    alltime = systime.time()
     sham_rl_pks = []
     sham_rl_lags = []
     sham_lr_pks = []
     sham_lr_lags = []
-    for ind, folder in enumerate(cmplx_sham_folders):
-        pathname = cmplx_sham_dir + folder 
+    sham_lf_step_freq = []
+    sham_lh_step_freq = []
+    sham_rf_step_freq = []
+    sham_rh_step_freq = []
+    for ind, folder in enumerate(animal_folders):
+        pathname = base_folder + folder 
         data = analyzeEpochedFolder(pathname, epoch_file)
-        lag_difs = []
         rl_lags = []
         lr_lags = []
         rl_peaks = []
         lr_peaks = []
-        peak_difs = []
+        lf_step_freq = []
+        lh_step_freq = []
+        rf_step_freq = []
+        rh_step_freq = []
         for f in data.keys():
             for ep in data[f]['corr_peak_lags']:
                 rl = ep[rl_pair]
                 lr = ep[lr_pair]
                 rl_lags.append(rl)
                 lr_lags.append(lr)
-                lag_difs.append(lr-rl)
             for ep in data[f]['corr_peaks']:
                 rl = ep[rl_pair]
                 lr = ep[lr_pair]
                 rl_peaks.append(rl)
                 lr_peaks.append(lr)
-                peak_difs.append(lr-rl)
-        axs[0][0].plot([ind for i in lag_difs], rl_lags, '*')
-        axs[0][1].plot([ind for i in lag_difs], lr_lags, '*')
-        axs[0][2].plot([ind for i in lag_difs], np.abs(lag_difs), '*')
-        axs[1][0].plot([ind for i in lag_difs], rl_peaks, '*')
-        axs[1][1].plot([ind for i in lag_difs], lr_peaks, '*')
-        axs[1][2].plot([ind for i in lag_difs], np.abs(peak_difs), '*')
-        axs[0][0].errorbar([ind], [np.mean(rl_lags)], yerr=[np.std(rl_lags)], color='k')
-        axs[0][1].errorbar([ind], [np.mean(lr_lags)], yerr=[np.std(lr_lags)], color='k')
-        axs[0][2].errorbar([ind], [np.mean(np.abs(lag_difs))], yerr=[np.std(np.abs(lag_difs))/len(lag_difs)], color='k',marker='*')
-        axs[1][0].errorbar([ind], [np.mean(rl_peaks)], yerr=[np.std(rl_peaks)], color='k')
-        axs[1][1].errorbar([ind], [np.mean(lr_peaks)], yerr=[np.std(lr_peaks)], color='k')
-        axs[1][2].errorbar([ind], [np.mean(np.abs(peak_difs))], yerr=[np.std(np.abs(peak_difs))/len(lag_difs)], color='k', marker='*')
-        sham_lag_difs.append(lag_difs)
-        sham_peak_difs.append(peak_difs)
+            for ep in data[f]['step_freqs']:
+                lf_step_freq.append(ep[varnames[0]])
+                lh_step_freq.append(ep[varnames[2]])
+                rf_step_freq.append(ep[varnames[1]])
+                rh_step_freq.append(ep[varnames[3]])
         sham_rl_pks.append(rl_peaks)
         sham_rl_lags.append(rl_lags)
         sham_lr_pks.append(lr_peaks)
         sham_lr_lags.append(lr_lags)
-    ## chi
-    chi_lag_difs = []
-    chi_peak_difs = []
-    chi_rl_pks = []
-    chi_rl_lags = []
-    chi_lr_pks = []
-    chi_lr_lags = []
-    for ind, folder in enumerate(cmplx_chi_folders):
-        pathname = cmplx_chi_dir + folder 
-        data = analyzeEpochedFolder(pathname, epoch_file)
-        lag_difs = []
-        rl_lags = []
-        lr_lags = []
-        rl_peaks = []
-        lr_peaks = []
-        peak_difs = []
-        for f in data.keys():
-            for ep in data[f]['corr_peak_lags']:
-                rl = ep[rl_pair]
-                lr = ep[lr_pair]
-                rl_lags.append(rl)
-                lr_lags.append(lr)
-                lag_difs.append(lr-rl)
-            for ep in data[f]['corr_peaks']:
-                rl = ep[rl_pair]
-                lr = ep[lr_pair]
-                rl_peaks.append(rl)
-                lr_peaks.append(lr)
-                peak_difs.append(lr-rl)
-        axs[0][0].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], rl_lags, 'o')
-        axs[0][1].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], lr_lags, 'o')
-        axs[0][2].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], np.abs(lag_difs), 'o')
-        axs[1][0].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], rl_peaks, 'o')
-        axs[1][1].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], lr_peaks, 'o')
-        axs[1][2].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], np.abs(peak_difs), 'o')
-        axs[0][0].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(rl_lags)], yerr=[np.std(rl_lags)], color='k')
-        axs[0][1].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(lr_lags)], yerr=[np.std(lr_lags)], color='k')
-        axs[0][2].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(np.abs(lag_difs))], yerr=[np.std(np.abs(lag_difs))/len(lag_difs)], color='k', marker='*')
-        axs[1][0].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(rl_peaks)], yerr=[np.std(rl_peaks)], color='k')
-        axs[1][1].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(lr_peaks)], yerr=[np.std(lr_peaks)], color='k')
-        axs[1][2].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(np.abs(peak_difs))], yerr=[np.std(np.abs(peak_difs))/len(lag_difs)], color='k', marker='*')
-        chi_lag_difs.append(lag_difs)
-        chi_peak_difs.append(peak_difs)
-        chi_rl_pks.append(rl_peaks)
-        chi_rl_lags.append(rl_lags)
-        chi_lr_pks.append(lr_peaks)
-        chi_lr_lags.append(lr_lags)
-    animal_labels = cmplx_sham_folders
-    animal_labels.extend([''])
-    animal_labels.extend(cmplx_chi_folders)
-    for r in axs:
-        for ax in r:
-            ax.set_xticklabels(animal_labels)
-    axs[0][0].set_title(str(rl_pair))
-    axs[0][1].set_title(str(lr_pair))
-    axs[0][2].set_title('Difference')
-    axs[0][0].set_ylabel('Lag of Peak Correlation')
-    axs[1][0].set_ylabel('Peak Correlation Magnitude')
-    axs[1][1].set_xlabel('Animal ID')
-    fig.savefig('figures/allRunningEpochs_' + day + '.png')
-    plt.ion()
-    plt.show()
+        sham_lf_step_freq.append(lf_step_freq)
+        sham_lh_step_freq.append(lh_step_freq)
+        sham_rf_step_freq.append(rf_step_freq)
+        sham_rh_step_freq.append(rh_step_freq)
+    out = {'rl_pks' : sham_rl_pks,
+        'rl_lags' : sham_rl_lags,
+        'lr_pks' : sham_lr_pks,
+        'lr_lags' : sham_lr_lags,
+        'lf_step_freq' : sham_lf_step_freq,
+        'lh_step_freq' : sham_lh_step_freq,
+        'rf_step_freq' : sham_rf_step_freq,
+        'rh_step_freq' : sham_rh_step_freq}
+    with open(output_folder + 'allRunningEpochs.json', 'w') as fileObj:
+        json.dump(out, fileObj)
+    print('All running epoch correlations execution time: %.2f seconds' % (systime.time() - alltime))
+
+    # cmplx_sham_dir = 'wheel_data/complex_wheel_day_3/Sham/'
+    # cmplx_sham_folders = ['09/', '10/', '11/', '12/']
+    # cmplx_chi_dir = 'wheel_data/complex_wheel_day_3/CHI/'
+    # cmplx_chi_folders = ['86/', '87/', '97/', '98/']
+    # day = 'D6'
+    # cmplx_sham_dir = 'data/SW_D6/'
+    # # cmplx_sham_folders = ['318087/',
+    # #                     '318510/',
+    # #                     '318512/',
+    # #                     '318511/',
+    # #                     '318509/',
+    # #                     '318098/',
+    # #                     '318097/',
+    # #                     '318086/']
+    # cmplx_sham_folders = ['318086/',
+    #                     '318087/',
+    #                     '318097/',
+    #                     '318098/']
+    # # cmplx_chi_dir = 'data/SW_D6/'
+    # cmplx_chi_dir = cmplx_sham_dir
+    # cmplx_chi_folders = ['318509/',
+    #                     '318510/',
+    #                     '318511/',
+    #                     '318512/']
+    # # cmplx_chi_folders = ['318098/',
+    # #                     '318086/',
+    # #                     '318087/',
+    # #                     '318512/',
+    # #                     '318097/',
+    # #                     '318509/',
+    # #                     '318511/',
+    # #                     '318510/']
+    # # basic running epoch stats 
+    # ep_fig, ep_axs = plt.subplots(1,2)
+    # cmplx_sham_ep_data = allRunningEpochs(cmplx_sham_dir, cmplx_sham_folders)
+    # cmplx_chi_ep_data = allRunningEpochs(cmplx_chi_dir, cmplx_chi_folders)
+    # ep_axs[0].errorbar([i for i in range(len(cmplx_sham_folders))], cmplx_sham_ep_data['avg'], yerr=cmplx_sham_ep_data['err'], color='blue', label='Sham')
+    # ep_axs[0].errorbar([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_ep_data['avg'], yerr=cmplx_chi_ep_data['err'], color='red', label='CHI')
+    # ep_axs[0].set_ylabel('Running Epoch Duration')
+    # ep_axs[0].set_xlabel('Animal ID')
+    # ep_axs[1].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_ep_data['N'], color='blue', label='Sham')
+    # ep_axs[1].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_ep_data['N'], color='red', label='CHI')
+    # ep_axs[1].set_ylabel('Number of Running Epochs')
+    # ep_axs[1].set_xlabel('Animal ID')
+    # ep_axs[1].legend()
+    # ep_fig.savefig('figures/epoch_stats_' + day + '.png')
+    # plt.tight_layout()
+    # # correlation data from longest running epoch 
+    # ## sham data
+    # cmplx_sham_corrs = corrLongestEpoch(cmplx_sham_dir, cmplx_sham_folders)
+    # ## CHI data
+    # cmplx_chi_corrs = corrLongestEpoch(cmplx_chi_dir, cmplx_chi_folders)
+    # lngcr_fig, lngcr_axs = plt.subplots(2, 2)
+    # lngcr_axs[0][0].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[rl_pair]['peaks'], '*-', label='Sham')
+    # lngcr_axs[0][0].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[rl_pair]['peaks'], '*-', label='CHI')
+    # lngcr_axs[0][0].set_title(str(rl_pair))
+    # lngcr_axs[0][0].set_ylabel('peak correlation')
+    # lngcr_axs[1][0].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[rl_pair]['lags'], '*-', label='Sham')
+    # lngcr_axs[1][0].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[rl_pair]['lags'],  '*-', label='CHI')
+    # lngcr_axs[1][0].set_ylabel('peak lag')
+    # lngcr_axs[1][0].set_xlabel('animal id')
+    # lngcr_axs[0][1].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[lr_pair]['peaks'], '*-', label='Sham')
+    # lngcr_axs[0][1].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[lr_pair]['peaks'],  '*-', label='CHI')
+    # lngcr_axs[0][1].set_title(str(lr_pair))
+    # lngcr_axs[1][1].plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_corrs[lr_pair]['lags'], '*-', label='Sham')
+    # lngcr_axs[1][1].plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_corrs[lr_pair]['lags'],  '*-', label='CHI')
+    # lngcr_axs[1][1].set_xlabel('animal id')
+    # lngcr_fig.savefig('figures/longest_epoch_' + day + '_corr.png')
+    # plt.tight_layout()
+    # # difference betwen left forearm - right hindleg peak lag and right forearm - left hindleg peak lag 
+    # cmplx_sham_lag_diff = [lr-rl for lr, rl in zip(cmplx_sham_corrs[lr_pair]['lags'], cmplx_sham_corrs[rl_pair]['lags'])]
+    # cmplx_chi_lag_diff = [lr-rl for lr, rl in zip(cmplx_chi_corrs[lr_pair]['lags'], cmplx_chi_corrs[rl_pair]['lags'])]
+    # lagdif_fig, lagdif_axs = plt.subplots(1,1)
+    # lagdif_axs.plot([i for i in range(len(cmplx_sham_folders))], cmplx_sham_lag_diff)
+    # lagdif_axs.plot([i for i in range(len(cmplx_sham_folders)+1, len(cmplx_sham_folders)+1+len(cmplx_chi_folders))], cmplx_chi_lag_diff)
+    # lagdif_axs.set_ylabel('Difference in peak lag')
+    # lagdif_fig.savefig('figures/diffInPeaklag_longestEpoch' + day + '.png')
+    # # looking at all running epochs 
+    # ## sham
+    # fig, axs = plt.subplots(2,3)
+    # sham_lag_difs = []
+    # sham_peak_difs = []
+    # sham_rl_pks = []
+    # sham_rl_lags = []
+    # sham_lr_pks = []
+    # sham_lr_lags = []
+    # for ind, folder in enumerate(cmplx_sham_folders):
+    #     pathname = cmplx_sham_dir + folder 
+    #     data = analyzeEpochedFolder(pathname, epoch_file)
+    #     lag_difs = []
+    #     rl_lags = []
+    #     lr_lags = []
+    #     rl_peaks = []
+    #     lr_peaks = []
+    #     peak_difs = []
+    #     for f in data.keys():
+    #         for ep in data[f]['corr_peak_lags']:
+    #             rl = ep[rl_pair]
+    #             lr = ep[lr_pair]
+    #             rl_lags.append(rl)
+    #             lr_lags.append(lr)
+    #             lag_difs.append(lr-rl)
+    #         for ep in data[f]['corr_peaks']:
+    #             rl = ep[rl_pair]
+    #             lr = ep[lr_pair]
+    #             rl_peaks.append(rl)
+    #             lr_peaks.append(lr)
+    #             peak_difs.append(lr-rl)
+    #     axs[0][0].plot([ind for i in lag_difs], rl_lags, '*')
+    #     axs[0][1].plot([ind for i in lag_difs], lr_lags, '*')
+    #     axs[0][2].plot([ind for i in lag_difs], np.abs(lag_difs), '*')
+    #     axs[1][0].plot([ind for i in lag_difs], rl_peaks, '*')
+    #     axs[1][1].plot([ind for i in lag_difs], lr_peaks, '*')
+    #     axs[1][2].plot([ind for i in lag_difs], np.abs(peak_difs), '*')
+    #     axs[0][0].errorbar([ind], [np.mean(rl_lags)], yerr=[np.std(rl_lags)], color='k')
+    #     axs[0][1].errorbar([ind], [np.mean(lr_lags)], yerr=[np.std(lr_lags)], color='k')
+    #     axs[0][2].errorbar([ind], [np.mean(np.abs(lag_difs))], yerr=[np.std(np.abs(lag_difs))/len(lag_difs)], color='k',marker='*')
+    #     axs[1][0].errorbar([ind], [np.mean(rl_peaks)], yerr=[np.std(rl_peaks)], color='k')
+    #     axs[1][1].errorbar([ind], [np.mean(lr_peaks)], yerr=[np.std(lr_peaks)], color='k')
+    #     axs[1][2].errorbar([ind], [np.mean(np.abs(peak_difs))], yerr=[np.std(np.abs(peak_difs))/len(lag_difs)], color='k', marker='*')
+    #     sham_lag_difs.append(lag_difs)
+    #     sham_peak_difs.append(peak_difs)
+    #     sham_rl_pks.append(rl_peaks)
+    #     sham_rl_lags.append(rl_lags)
+    #     sham_lr_pks.append(lr_peaks)
+    #     sham_lr_lags.append(lr_lags)
+    # ## chi
+    # chi_lag_difs = []
+    # chi_peak_difs = []
+    # chi_rl_pks = []
+    # chi_rl_lags = []
+    # chi_lr_pks = []
+    # chi_lr_lags = []
+    # for ind, folder in enumerate(cmplx_chi_folders):
+    #     pathname = cmplx_chi_dir + folder 
+    #     data = analyzeEpochedFolder(pathname, epoch_file)
+    #     lag_difs = []
+    #     rl_lags = []
+    #     lr_lags = []
+    #     rl_peaks = []
+    #     lr_peaks = []
+    #     peak_difs = []
+    #     for f in data.keys():
+    #         for ep in data[f]['corr_peak_lags']:
+    #             rl = ep[rl_pair]
+    #             lr = ep[lr_pair]
+    #             rl_lags.append(rl)
+    #             lr_lags.append(lr)
+    #             lag_difs.append(lr-rl)
+    #         for ep in data[f]['corr_peaks']:
+    #             rl = ep[rl_pair]
+    #             lr = ep[lr_pair]
+    #             rl_peaks.append(rl)
+    #             lr_peaks.append(lr)
+    #             peak_difs.append(lr-rl)
+    #     axs[0][0].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], rl_lags, 'o')
+    #     axs[0][1].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], lr_lags, 'o')
+    #     axs[0][2].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], np.abs(lag_difs), 'o')
+    #     axs[1][0].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], rl_peaks, 'o')
+    #     axs[1][1].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], lr_peaks, 'o')
+    #     axs[1][2].plot([ind + len(cmplx_sham_folders) + 1 for i in lag_difs], np.abs(peak_difs), 'o')
+    #     axs[0][0].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(rl_lags)], yerr=[np.std(rl_lags)], color='k')
+    #     axs[0][1].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(lr_lags)], yerr=[np.std(lr_lags)], color='k')
+    #     axs[0][2].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(np.abs(lag_difs))], yerr=[np.std(np.abs(lag_difs))/len(lag_difs)], color='k', marker='*')
+    #     axs[1][0].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(rl_peaks)], yerr=[np.std(rl_peaks)], color='k')
+    #     axs[1][1].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(lr_peaks)], yerr=[np.std(lr_peaks)], color='k')
+    #     axs[1][2].errorbar([ind + len(cmplx_sham_folders) + 1], [np.mean(np.abs(peak_difs))], yerr=[np.std(np.abs(peak_difs))/len(lag_difs)], color='k', marker='*')
+    #     chi_lag_difs.append(lag_difs)
+    #     chi_peak_difs.append(peak_difs)
+    #     chi_rl_pks.append(rl_peaks)
+    #     chi_rl_lags.append(rl_lags)
+    #     chi_lr_pks.append(lr_peaks)
+    #     chi_lr_lags.append(lr_lags)
+    # animal_labels = cmplx_sham_folders
+    # animal_labels.extend([''])
+    # animal_labels.extend(cmplx_chi_folders)
+    # for r in axs:
+    #     for ax in r:
+    #         ax.set_xticklabels(animal_labels)
+    # axs[0][0].set_title(str(rl_pair))
+    # axs[0][1].set_title(str(lr_pair))
+    # axs[0][2].set_title('Difference')
+    # axs[0][0].set_ylabel('Lag of Peak Correlation')
+    # axs[1][0].set_ylabel('Peak Correlation Magnitude')
+    # axs[1][1].set_xlabel('Animal ID')
+    # fig.savefig('figures/allRunningEpochs_' + day + '.png')
+    # plt.ion()
+    # plt.show()
 
 
 # if __name__ == '__main__':
