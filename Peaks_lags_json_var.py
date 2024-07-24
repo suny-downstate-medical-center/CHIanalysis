@@ -287,6 +287,7 @@ def analyzeEpochedFolder(pathname, epoch_file, fps=240, var='relative_dist'):
         out[filename] = {'corr_peaks' : [], 
                         'corr_peak_lags': [], 
                         'step_freqs' : [],
+                        'step_var' : [],
                         'epoch_durs' : []}
         ## preprocessing 
         df = loadCSV(pathname, filename)
