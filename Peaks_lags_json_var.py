@@ -329,25 +329,32 @@ def analyzeEpochedFolder(pathname, epoch_file, fps=240, var='relative_dist'):
             out[filename]['corr_peak_lags'].append(corr_peak_lags)
             ## FFT / step frequency 
             step_freqs = {}
-            for ind, varname in enumerate(varnames):
-                y0 = [val for val, t in zip(df[varname][var+'_fix'].values, df['time'].values) if epoch[0] < t < epoch[1]]
-                y0 = y0 - np.mean(y0)
-                y0 = y0 / np.max(y0)
-                Y = (fft(y0)/len(y0))[0:int(len(y0)/2)]
-                Freq = np.linspace(0.0, fps/2.0, len(Y))
-                step_freqs[varname] = Freq[np.argmax(Y)]
-            out[filename]['step_freqs'].append(step_freqs)
             ### step variability
             step_var = {}
             for ind, varname in enumerate(varnames):
                 y0 = [val for val, t in zip(df[varname][var+'_fix'].values, df['time'].values) if epoch[0] < t < epoch[1]]
                 y0 = y0 - np.mean(y0)
                 y0 = y0 / np.max(y0)
-                y0 = y0 - np.std(y0)
                 Y = (fft(y0)/len(y0))[0:int(len(y0)/2)]
-                Var = np.linspace(0.0, fps/2.0, len(Y))
-                step_var[varname] = Var[np.argmax(Y)]
+                Freq = np.linspace(0.0, fps/2.0, len(Y))
+                Y = Y[np.logical_and(Freq >= 0.2, Freq <= 10)]
+                Y = np.abs(Y)
+                Y = smooth(Y,20)
+                Freq = Freq[np.logical_and(Freq >= 0.2, Freq <= 10)]
+                step_freqs[varname] = Freq[np.argmax(Y)]
+                step_var[varname] = np.std(Y)
+            out[filename]['step_freqs'].append(step_freqs)
             out[filename]['step_var'].append(step_var)
+                        
+            #for ind, varname in enumerate(varnames):
+                #y0 = [val for val, t in zip(df[varname][var+'_fix'].values, df['time'].values) if epoch[0] < t < epoch[1]]
+               # y0 = y0 - np.mean(y0)
+               # y0 = y0 / np.max(y0)
+               # y0 = y0 - np.std(y0)
+               # Y = (fft(y0)/len(y0))[0:int(len(y0)/2)]
+               # Var = np.linspace(0.0, fps/2.0, len(Y))
+               # step_var[varname] = Var[np.argmax(Y)]
+            #out[filename]['step_var'].append(step_var)
         # plt.show()
     return out
 
@@ -429,22 +436,22 @@ if __name__ == '__main__':
     except:
         pass 
 
-    # basic running epoch stats 
-    epoch_stats = allRunningEpochs(base_folder, animal_folders)
-    with open(output_folder + 'epochStats.json', 'w') as fileObj:
-        json.dump(epoch_stats, fileObj)
-    print('Epoch statistics execution time: %.2f seconds' % (systime.time() - start_time))
+    # # basic running epoch stats 
+    # epoch_stats = allRunningEpochs(base_folder, animal_folders)
+    # with open(output_folder + 'epochStats.json', 'w') as fileObj:
+    #     json.dump(epoch_stats, fileObj)
+    # print('Epoch statistics execution time: %.2f seconds' % (systime.time() - start_time))
 
-    # correlation analysis of longest running epochs for each animal 
-    corrtime = systime.time()
-    longest_epoch_corr = corrLongestEpoch(base_folder, animal_folders)
-    corr_output = {'rl' : longest_epoch_corr[('right_forearm1', 'left_hindleg1')], 
-                    'lr' : longest_epoch_corr[('left_forearm1', 'right_hindleg1')]}
-    # for key in corr_output:
-    #     corr_output[key]['lags'] = [int(l) for l in corr_output[key]['lags']]
-    with open(output_folder + 'longestRunnigEpoch.json', 'w') as fileObj:
-        json.dump(corr_output, fileObj)
-    print('Longest running epoch correlations execution time: %.2f seconds' % (systime.time() - corrtime))
+    # # correlation analysis of longest running epochs for each animal 
+    # corrtime = systime.time()
+    # longest_epoch_corr = corrLongestEpoch(base_folder, animal_folders)
+    # corr_output = {'rl' : longest_epoch_corr[('right_forearm1', 'left_hindleg1')], 
+    #                 'lr' : longest_epoch_corr[('left_forearm1', 'right_hindleg1')]}
+    # # for key in corr_output:
+    # #     corr_output[key]['lags'] = [int(l) for l in corr_output[key]['lags']]
+    # with open(output_folder + 'longestRunnigEpoch.json', 'w') as fileObj:
+    #     json.dump(corr_output, fileObj)
+    # print('Longest running epoch correlations execution time: %.2f seconds' % (systime.time() - corrtime))
 
     # coorelation analysis of all running epochs 
     alltime = systime.time()
@@ -463,6 +470,7 @@ if __name__ == '__main__':
     for ind, folder in enumerate(animal_folders):
         pathname = base_folder + folder 
         data = analyzeEpochedFolder(pathname, epoch_file)
+        #import IPython; IPython.embed()
         rl_lags = []
         lr_lags = []
         rl_peaks = []
