@@ -154,7 +154,6 @@ def analyzeFolder(pathname, var_name='LHfoot', Fs=60, base=374, pixelFactor=1, s
         lh_y_smooth = np.multiply(lh_y_smooth, pixelFactor)
 
         time = np.linspace(0, len(df[var_name]['y'])/Fs, len(df[var_name]['y']))
-
         ints = intervalsBelow(lh_y_smooth)
         if len(ints):
             ### compute good shit 
@@ -164,6 +163,12 @@ def analyzeFolder(pathname, var_name='LHfoot', Fs=60, base=374, pixelFactor=1, s
             slip_frequency.append(slipFrequency(time, lh_y_smooth))
             avg_slip_magnitude.append(np.mean(fallMagnitudes(lh_y_smooth)))
             slip_number.append(slipNumber(lh_y_smooth))
+        else:
+            negative_abasement.append(np.nan)
+            total_time_below.append(0)
+            slip_frequency.append(0)
+            avg_slip_magnitude.append(np.nan)
+            slip_number.append(0)
 
     ## collect output
     out = {'file_name' : file_names,
